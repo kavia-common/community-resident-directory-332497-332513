@@ -26,11 +26,20 @@ export default function AnnouncementsPage() {
   const { session } = useSession();
   const [items, setItems] = React.useState<Announcement[]>(demoAnnouncements);
 
-  useWebSocket<Announcement>({
-    // Backend currently does not implement WS; keep wiring ready:
-    path: "/ws/announcements",
+  useWebSocket<{ type: string; announcement?: Announcement }>({
+    path: session?.token
+      ? `/realtime/announcements?token=${encodeURIComponent(session.token)}`
+      : "/realtime/announcements?token=",
     onMessage: (msg) => {
-      setItems((prev) => [msg, ...prev]);
+      // Only handle announcement events; ignore keepalive/unknown messages safely.
+      if (msg?.type === "announcement.created" && msg.announcement) {
+        setItems((prev) => [msg.announcement!, ...prev]);
+      }
+      if (msg?.type === "announcement.updated" && msg.announcement) {
+        setItems((prev) =>
+          prev.map((a) => (a.id === msg.announcement!.id ? msg.announcement! : a))
+        );
+      }
     },
   });
 
